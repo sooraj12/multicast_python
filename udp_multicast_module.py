@@ -5,7 +5,8 @@ import struct
 hostip = '192.168.1.4'
 grpaddr = '239.1.2.3'
 port = 5001
-msg = {'message': 'message from sender', 'status': 'success'}
+msg = {'message': 'message from windows', 'status': 'success'}
+ack = {'res': 'acknowledge from windows'}
 
 sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP, fileno=None)
 
@@ -22,7 +23,7 @@ def send_and_receive():
 
 
     data, server = sock.recvfrom(16)
-    print(f'received {data.decode()} from {server}')
+    print(f'received {json.loads(data)} from {server}')
     # sock.close()
 
 def receive_messages():
@@ -35,8 +36,9 @@ def receive_messages():
 
     while True:
         buf, senderaddr = sock.recvfrom(1024)
+        print(buf)
         msg = json.loads(buf)
 
         print(f'received from {senderaddr}, message {msg}')
 
-        sock.sendto('ack'.encode(), senderaddr)
+        sock.sendto(json.dumps(ack).encode('utf-8'), senderaddr)
