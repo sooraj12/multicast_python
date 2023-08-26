@@ -22,8 +22,8 @@ def send_and_receive():
     sender.sendto(encoded, mcgrp)
 
 
-    data, server = sender.recvfrom(16)
-    print(f'received {json.loads(data)} from {server}')
+    # data, server = sender.recvfrom(16)
+    # print(f'received {json.loads(data)} from {server}')
 
 def receive_messages():
     receiver = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP, fileno=None)
@@ -35,9 +35,9 @@ def receive_messages():
 
     while True:
         buf, senderaddr = receiver.recvfrom(1024)
-        print(buf)
+
         msg = json.loads(buf)
 
         print(f'received from {senderaddr}, message {msg}')
 
-        receiver.sendto(json.dumps(ack).encode('utf-8'), senderaddr)
+        # receiver.sendto(json.dumps(ack).encode('utf-8'), senderaddr)
