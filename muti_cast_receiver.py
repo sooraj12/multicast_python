@@ -1,7 +1,7 @@
 import socket
 import struct
 import json
-import asyncio
+import threading
 
 from flask import Flask, jsonify
 
@@ -21,14 +21,14 @@ mreq = struct.pack("=4s4s", socket.inet_aton(grpaddr), socket.inet_aton(fromip))
 receiver.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
 
-async def receive_messages():
+def receive_message():
     while True:
-        buf, senderaddr = await asyncio.to_thread(receiver.recvfrom, 1024)
+        buf, senderaddr = receiver.recvfrom(1024)
         msg = json.loads(buf)
 
         print(f'received from {senderaddr}, message {msg}')
 
-        await asyncio.to_thread(receiver.sendto, 'ack'.encode(), senderaddr)
+        receiver.sendto('ack'.encode(), senderaddr)
 
 @app.route('/health' , methods = ["GET"])
 def health():
@@ -37,9 +37,12 @@ def health():
 
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    receive_task = loop.create_task(receive_messages())
+    # Create and start the thread for receiving messages
+    message_thread = threading.Thread(target=receive_message)
+    message_thread.daemon = True
+    message_thread.start()
 
+    # Run the Flask app
     app.run(host='0.0.0.0', port=5000)
 
 
