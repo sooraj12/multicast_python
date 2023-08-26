@@ -1,42 +1,42 @@
 import socket
 import json
 import struct
-import asyncio
 
+hostip = '192.168.1.4'
+grpaddr = '239.1.2.3'
+port = 5001
+msg = {'message': 'message from sender', 'status': 'success'}
 
-async def send_and_receive(hostip, grpaddr, port, msg):
-    sender = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP, fileno=None)
-    
+sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP, fileno=None)
+
+def send_and_receive():
+   
     mcgrp = (grpaddr, port)
 
-    sender.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
-    sender.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(hostip))
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(hostip))
 
     print(f'sending {msg}')
     encoded = json.dumps(msg).encode('utf-8')
-    sent = sender.sendto(encoded, mcgrp)
+    sock.sendto(encoded, mcgrp)
 
-    loop = asyncio.get_event_loop()
-    receiver_task = loop.run_in_executor(None, sender.recvfrom, 16)
-    await asyncio.wait([receiver_task])
 
-    data, server = receiver_task.result()
+    data, server = sock.recvfrom(16)
     print(f'received {data.decode()} from {server}')
-    sender.close()
+    # sock.close()
 
-async def receive_messages(fromip, grpaddr, port):
-    receiver = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP, fileno=None)
+def receive_messages():
 
     bindaddr = ('', port)
-    receiver.bind(bindaddr)
+    sock.bind(bindaddr)
 
-    mreq = struct.pack("=4s4s", socket.inet_aton(grpaddr), socket.inet_aton(fromip))
-    receiver.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+    mreq = struct.pack("=4s4s", socket.inet_aton(grpaddr), socket.inet_aton(hostip))
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
     while True:
-        buf, senderaddr = await asyncio.to_thread(receiver.recvfrom, 1024)
+        buf, senderaddr = sock.recvfrom(1024)
         msg = json.loads(buf)
 
         print(f'received from {senderaddr}, message {msg}')
 
-        await asyncio.to_thread(receiver.sendto, 'ack'.encode(), senderaddr)
+        sock.sendto('ack'.encode(), senderaddr)
