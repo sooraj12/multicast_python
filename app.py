@@ -12,8 +12,8 @@ app = Flask(__name__)
 
 # Configuration
 hostip = '192.168.1.3'
-grpaddr = '239.1.2.3'
-port = 5001
+grpaddr = '234.0.0.1'
+port = 42100
 max_workers = 10  # Number of threads in the thread pool
 
 # Initialize logging
@@ -46,7 +46,7 @@ thread_pool = ThreadPoolExecutor(max_workers=max_workers)
 def send_and_receive(channel):
     try:  
         mcgrp = (grpaddr, port)
-        msg = {'type': 'message', 'message': 'message from' + hostip, 'status': 'success'}
+        msg = {'type': 'message', 'message': 'message from ' + hostip, 'status': 'success'}
         encoded = json.dumps(msg).encode('utf-8')
         channel.sendto(encoded, mcgrp)
 
