@@ -14,8 +14,8 @@ port = 5001
 msg = {'type': 'message', 'message': 'message from windows', 'status': 'success'}
 ack = {'type': 'ack', 'res': 'acknowledge from windows'}
 
-channel = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM,
-                       proto=socket.IPPROTO_UDP, fileno=None)
+channel = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP, fileno=None)
+channel.setblocking(False)
 
 def send_and_receive():
     try:
@@ -28,6 +28,20 @@ def send_and_receive():
 
         encoded = json.dumps(msg).encode('utf-8')
         channel.sendto(encoded, mcgrp)
+
+         # Wait for acknowledgment
+        channel.settimeout(5)  # Adjust the timeout as needed
+        try:
+            ack_data, _ = channel.recvfrom(1024)
+            received_ack = json.loads(ack_data)
+            if received_ack.get('type') == 'ack' and received_ack.get('res') == 'acknowledge from receiver':
+                print("Acknowledgment received from receiver.")
+            else:
+                print("Received unexpected response from receiver.")
+        except socket.timeout:
+            print("No acknowledgment received.")
+
+
     except Exception as e:
         print(f"Error in sending: {e}")
 
@@ -44,8 +58,12 @@ def receive_messages():
             buf, senderaddr = channel.recvfrom(1024)
 
             msg = json.loads(buf)
-
             print(f'received from {senderaddr}, message {msg}')
+
+            # Send acknowledgment back to sender
+            ack_msg = json.dumps(ack).encode('utf-8')
+            channel.sendto(ack_msg, senderaddr)
+
     except Exception as e:
         print(f"Error in receiving: {e}")
 
