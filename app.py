@@ -22,37 +22,38 @@ logger = logging.getLogger(__name__)
 
 # Global variables
 shutdown_event = threading.Event()
-channel = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP, fileno=None)
-msg = {'type': 'message', 'message': 'message from mac', 'status': 'success'}
-ack = {'type': 'ack', 'res': 'acknowledge from mac'}
 
-try:
-    channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
-    channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(hostip))
-    channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 0)
-    bindaddr = ('', port)
-    channel.bind(bindaddr)
-    mreq = struct.pack("=4s4s", socket.inet_aton(grpaddr), socket.inet_aton(hostip))
-    channel.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-except Exception as e:
-    logger.error(f"Error setting up socket: {e}")
-    raise SystemExit(1)
+def setup_socket():
+    try:
+        channel = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP, fileno=None)
+        channel.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
+        channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(hostip))
+        channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 0)
+        channel.bind(('', port))
+        mreq = struct.pack("=4s4s", socket.inet_aton(grpaddr), socket.inet_aton(hostip))
+        channel.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+
+        return channel
+    except Exception as e:
+        logger.error(f"Error setting up socket: {e}")
+        raise SystemExit(1)
 
 # Thread pool for handling requests
 thread_pool = ThreadPoolExecutor(max_workers=max_workers)
 
 
-def send_and_receive():
-    try:
-      
+def send_and_receive(channel):
+    try:  
         mcgrp = (grpaddr, port)
+        msg = {'type': 'message', 'message': 'message from' + hostip, 'status': 'success'}
         encoded = json.dumps(msg).encode('utf-8')
         channel.sendto(encoded, mcgrp)
 
     except Exception as e:
         logger.error(f"Error in sending: {e}")
 
-def receive_messages():
+def receive_messages(channel):
     try:
         while not shutdown_event.is_set():
             buf, senderaddr = channel.recvfrom(1024)
@@ -62,12 +63,11 @@ def receive_messages():
     except Exception as e:
         logger.error(f"Error in receiving: {e}")
 
-def shutdown():
+def shutdown(channel):
     global shutdown_event
     print("Shutting down...")
+    channel.close()
     shutdown_event.set()
-
-app = Flask(__name__)
 
 @app.route('/health', methods=["GET"])
 def health():
@@ -75,16 +75,20 @@ def health():
 
 @app.route('/send', methods=['GET'])
 def send():
-    thread_pool.submit(send_and_receive)
+    thread_pool.submit(send_and_receive, channel)
     return jsonify(message="OK"), 200
 
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal.SIG_DFL)  # Reset Ctrl+C handling to default
-
-    message_thread = threading.Thread(target=receive_messages)
+    
+    channel = setup_socket()
+    
+    thread_pool = ThreadPoolExecutor(max_workers=max_workers)
+    
+    message_thread = threading.Thread(target=receive_messages, args=(channel,))
     message_thread.daemon = True
     message_thread.start()
-
-    atexit.register(shutdown)  # Register the shutdown function with atexit
-
+    
+    atexit.register(shutdown, channel)
+    
     app.run(host='0.0.0.0', port=5000)
