@@ -89,7 +89,7 @@ def send_and_receive(msg):
 
 def receive_messages():
     try:
-        chunk_buffer = {} 
+        chunk_buffer = {}
         while not shutdown_event.is_set():
             try:
                 buf, senderaddr = channel.recvfrom(1024)
@@ -103,7 +103,7 @@ def receive_messages():
 
                     if len(chunk_buffer) == total_chunks:
                         complete_message = "".join(chunk_buffer[i] for i in range(total_chunks))
-                        del chunk_buffer
+                        chunk_buffer = {}
                         logger.info(f"Received message from {senderaddr}: {complete_message}")
 
             except socket.error as e:
