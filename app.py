@@ -49,10 +49,11 @@ igmp_packet_without_checksum = struct.pack("!BBH4s", igmp_type, max_response_tim
 
 # Calculate the checksum over the entire packet excluding the checksum field itself
 checksum = calculate_checksum(igmp_packet_without_checksum)
+correct_checksum = ((checksum & 0xFF) << 8) | ((checksum >> 8) & 0xFF)
 # Now update the packet with the correct checksum value
-igmp_packet = struct.pack("!BBH4s", igmp_type, max_response_time, checksum, socket.inet_aton(grpaddr))
+igmp_packet = struct.pack("!BBH4s", igmp_type, max_response_time, correct_checksum, socket.inet_aton(grpaddr))
 
-igmp_packet = igmp_packet[:2] + struct.pack("!H", checksum) + igmp_packet[4:]
+igmp_packet = igmp_packet[:2] + struct.pack("!H", correct_checksum) + igmp_packet[4:]
 
 
 def setup_socket():
