@@ -10,7 +10,7 @@ addr_family = socket.AF_INET
 app = Flask(__name__)
 
 def listener_thread(addr_family):
-      with multicast_expert.McastRxSocket(addr_family, mcast_ips=[grpaddr], port=port, blocking=False) as rx_socket:
+      with multicast_expert.McastRxSocket(addr_family, mcast_ips=[grpaddr], port=port, blocking=True) as rx_socket:
         while True:
             recv_result = rx_socket.recvfrom()
             if recv_result is not None:
