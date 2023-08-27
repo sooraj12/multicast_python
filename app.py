@@ -8,23 +8,18 @@ import atexit
 
 # Global variables
 shutdown_event = threading.Event()
-hostip = '192.168.1.4'
+hostip = '192.168.1.3'
 grpaddr = '239.1.2.3'
 port = 5001
-msg = {'type': 'message', 'message': 'message from windows', 'status': 'success'}
-ack = {'type': 'ack', 'res': 'acknowledge from windows'}
+msg = {'type': 'message', 'message': 'message from mac', 'status': 'success'}
+ack = {'type': 'ack', 'res': 'acknowledge from mac'}
 
 channel = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP, fileno=None)
 
 def send_and_receive():
-    global current_sequence_number
     try:
       
         mcgrp = (grpaddr, port)
-
-        # Increment sequence number for each message
-        current_sequence_number += 1
-        msg['sequence_number'] = current_sequence_number
 
         channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
         channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(hostip))
