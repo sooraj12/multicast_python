@@ -24,6 +24,7 @@ def send_and_receive():
 
         channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
         channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(hostip))
+        channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 0)
 
         encoded = json.dumps(msg).encode('utf-8')
         channel.sendto(encoded, mcgrp)
