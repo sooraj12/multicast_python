@@ -15,7 +15,6 @@ msg = {'type': 'message', 'message': 'message from windows', 'status': 'success'
 ack = {'type': 'ack', 'res': 'acknowledge from windows'}
 
 channel = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP, fileno=None)
-channel.setblocking(False)
 
 def send_and_receive():
     try:
