@@ -93,9 +93,9 @@ def receive_messages():
     try:
         while not shutdown_event.is_set():
             buf, senderaddr = channel.recvfrom(1024)
-            received_msg = json.loads(buf)
-            logger.info(f"Received message from {senderaddr}: {received_msg}")
-
+            if buf:
+                received_msg = json.loads(buf)
+                logger.info(f"Received message from {senderaddr}: {received_msg}")
     except Exception as e:
         logger.error(f"Error in receiving: {e}")
 
