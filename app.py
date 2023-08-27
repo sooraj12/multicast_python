@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 # Global variables
 shutdown_event = threading.Event()
+channel_lock = threading.Lock()
+channel = None
 
 def setup_socket():
     try:
@@ -40,30 +42,31 @@ def setup_socket():
         logger.error(f"Error setting up socket: {e}")
         raise SystemExit(1)
 
-def send_keep_alive(channel):
+def send_keep_alive():
     while not shutdown_event.is_set():
         try:
             msg = {'type': 'keep_alive', 'status': 'OK'}
             encoded = json.dumps(msg).encode('utf-8')
-            channel.sendto(encoded, (grpaddr, port))
+            with channel_lock:
+                channel.sendto(encoded, (grpaddr, port))
             logger.info("Sent keep-alive message")
 
             shutdown_event.wait(keep_alive_interval)
         except Exception as e:
             logger.error(f"Error sending keep-alive: {e}")
 
-
-def send_and_receive(channel):
+def send_and_receive():
     try:  
         mcgrp = (grpaddr, port)
         msg = {'type': 'message', 'message': 'message from ' + hostip, 'status': 'success'}
         encoded = json.dumps(msg).encode('utf-8')
-        channel.sendto(encoded, mcgrp)
+        with channel_lock:
+            channel.sendto(encoded, mcgrp)
 
     except Exception as e:
         logger.error(f"Error in sending: {e}")
 
-def receive_messages(channel):
+def receive_messages():
     try:
         while not shutdown_event.is_set():
             buf, senderaddr = channel.recvfrom(1024)
@@ -73,11 +76,11 @@ def receive_messages(channel):
     except Exception as e:
         logger.error(f"Error in receiving: {e}")
 
-def shutdown(channel):
-    global shutdown_event
-    print("Shutting down...")
-    channel.close()
-    shutdown_event.set()
+def shutdown():
+    with channel_lock:
+        if channel:
+            channel.close()
+        shutdown_event.set()
 
 @app.route('/health', methods=["GET"])
 def health():
@@ -85,24 +88,23 @@ def health():
 
 @app.route('/send', methods=['GET'])
 def send():
-    thread_pool.submit(send_and_receive, channel)
+    thread_pool.submit(send_and_receive)
     return jsonify(message="OK"), 200
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGINT, signal.SIG_DFL)  # Reset Ctrl+C handling to default
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
     
     channel = setup_socket()
-    
     thread_pool = ThreadPoolExecutor(max_workers=max_workers)
     
-    message_thread = threading.Thread(target=receive_messages, args=(channel,))
+    message_thread = threading.Thread(target=receive_messages)
     message_thread.daemon = True
     message_thread.start()
 
-    keep_alive_thread = threading.Thread(target=send_keep_alive, args=(channel,))
+    keep_alive_thread = threading.Thread(target=send_keep_alive)
     keep_alive_thread.daemon = True
     keep_alive_thread.start()
     
-    atexit.register(shutdown, channel)
+    atexit.register(shutdown)
     
     app.run(host='0.0.0.0', port=5000)
