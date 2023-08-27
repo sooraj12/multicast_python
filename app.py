@@ -45,9 +45,13 @@ def calculate_checksum(data):
     return socket.htons(~s & 0xFFFF)
 
 # IGMPv2 Membership Report packet structure
+igmp_packet_without_checksum = struct.pack("!BBH4s", igmp_type, max_response_time, 0, socket.inet_aton(grpaddr))
+
+# Calculate the checksum over the entire packet excluding the checksum field itself
+checksum = calculate_checksum(igmp_packet_without_checksum)
+# Now update the packet with the correct checksum value
 igmp_packet = struct.pack("!BBH4s", igmp_type, max_response_time, checksum, socket.inet_aton(grpaddr))
 
-checksum = calculate_checksum(igmp_packet)
 igmp_packet = igmp_packet[:2] + struct.pack("!H", checksum) + igmp_packet[4:]
 
 
