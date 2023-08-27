@@ -5,7 +5,6 @@ from flask import Flask, jsonify
 import threading
 import signal
 import atexit
-import sys
 
 # Global variables
 shutdown_event = threading.Event()
