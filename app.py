@@ -42,7 +42,30 @@ def setup_socket():
         logger.error(f"Error setting up socket: {e}")
         raise SystemExit(1)
 
+def send_membership_report():
+    while not shutdown_event.is_set():
+        try:
+            # Create a socket for sending membership reports
+            report_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            
+            # Send an empty UDP packet to the multicast group address and port
+            report_socket.sendto(b'', (grpaddr, port))
+            report_socket.close()
+
+            logger.info("Sent membership report")
+
+            # Wait for the next interval before sending the next report
+            shutdown_event.wait(keep_alive_interval)
+        except Exception as e:
+            logger.error(f"Error sending membership report: {e}")
+
+
 def send_keep_alive():
+    # Start the thread for sending membership reports
+    membership_thread = threading.Thread(target=send_membership_report)
+    membership_thread.daemon = True
+    membership_thread.start()
+
     while not shutdown_event.is_set():
         try:
             msg = {'type': 'keep_alive', 'status': 'OK'}
