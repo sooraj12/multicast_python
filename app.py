@@ -71,7 +71,7 @@ def send_and_receive(msg):
     try:
         mcgrp = (grpaddr, port)
         encoded = json.dumps(msg).encode('utf-8')
-        chunk_size = 256 
+        chunk_size = 1024 
 
         for i in range(0, len(encoded), chunk_size):
             chunk = encoded[i:i + chunk_size]
