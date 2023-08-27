@@ -14,11 +14,11 @@ from flask import Flask, jsonify
 app = Flask(__name__)
 
 # Configuration
-hostip = '192.168.1.3'
+hostip = '192.168.1.4'
 grpaddr = '234.0.0.1'
 port = 42100
 max_workers = 10  # Number of threads in the thread pool
-keep_alive_interval = 30  # Interval for sending keep-alive messages in seconds
+keep_alive_interval = 10  # Interval for sending keep-alive messages in seconds
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -28,6 +28,28 @@ logger = logging.getLogger(__name__)
 shutdown_event = threading.Event()
 channel_lock = threading.Lock()
 channel = None
+
+# Construct IGMP Membership Report packet
+igmp_type = 0x22  # IGMP Membership Report
+max_response_time = 0x00  # Unused in IGMPv2
+checksum = 0x0000  # Placeholder for checksum
+
+
+# Calculate checksum (set checksum field to 0 and then compute the checksum)
+def calculate_checksum(data):
+    if len(data) % 2 == 1:
+        data += b'\x00'
+    s = sum(struct.unpack('!%sH' % (len(data) // 2), data))
+    s = (s >> 16) + (s & 0xFFFF)
+    s += (s >> 16)
+    return socket.htons(~s & 0xFFFF)
+
+# IGMPv2 Membership Report packet structure
+igmp_packet = struct.pack("!BBH4s", igmp_type, max_response_time, checksum, socket.inet_aton(grpaddr))
+
+checksum = calculate_checksum(igmp_packet)
+igmp_packet = igmp_packet[:2] + struct.pack("!H", checksum) + igmp_packet[4:]
+
 
 def setup_socket():
     try:
@@ -48,16 +70,12 @@ def setup_socket():
 def send_membership_report():
     while not shutdown_event.is_set():
         try:
-            # Create a socket for sending membership reports
-            report_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            
-            # Send an empty UDP packet to the multicast group address and port
-            report_socket.sendto(b'', (grpaddr, port))
-            report_socket.close()
-
+            sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IGMP)
+            sock.bind((hostip, port))
+            sock.sendto(igmp_packet, (grpaddr, port))
             logger.info("Sent membership report")
 
-            # Wait for the next interval before sending the next report
+            # # Wait for the next interval before sending the next report
             shutdown_event.wait(keep_alive_interval)
         except Exception as e:
             logger.error(f"Error sending membership report: {e}")
