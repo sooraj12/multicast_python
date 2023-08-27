@@ -15,51 +15,30 @@ msg = {'type': 'message', 'message': 'message from mac', 'status': 'success'}
 ack = {'type': 'ack', 'res': 'acknowledge from mac'}
 
 channel = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP, fileno=None)
+channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
+channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(hostip))
 channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 0)
+bindaddr = ('', port)
+channel.bind(bindaddr)
+mreq = struct.pack("=4s4s", socket.inet_aton(grpaddr), socket.inet_aton(hostip))
+channel.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
 def send_and_receive():
     try:
       
         mcgrp = (grpaddr, port)
-
-        channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
-        channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(hostip))
-
         encoded = json.dumps(msg).encode('utf-8')
         channel.sendto(encoded, mcgrp)
-
-         # Wait for acknowledgment
-        channel.settimeout(5)  # Adjust the timeout as needed
-        try:
-            ack_data, _ = channel.recvfrom(1024)
-            received_ack = json.loads(ack_data)
-            print(f"Acknowledgment received from receiver. {received_ack}.")
-        except socket.timeout:
-            print("No acknowledgment received.")
-
 
     except Exception as e:
         print(f"Error in sending: {e}")
 
 def receive_messages():
     try:
-        bindaddr = ('', port)
-        channel.bind(bindaddr)
-
-        mreq = struct.pack("=4s4s", socket.inet_aton(grpaddr), socket.inet_aton(hostip))
-        channel.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-
-
         while not shutdown_event.is_set():
             buf, senderaddr = channel.recvfrom(1024)
 
             msg = json.loads(buf)
-
-            # Send acknowledgment back to sender with the received sequence number
-            ack_msg = ack
-            ack_msg_encoded = json.dumps(ack_msg).encode('utf-8')
-      
-            channel.sendto(ack_msg_encoded, senderaddr)
 
             print(f"Received message from {senderaddr}: {msg}")
 
