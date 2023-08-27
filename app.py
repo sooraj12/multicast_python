@@ -12,9 +12,10 @@ app = Flask(__name__)
 
 # Configuration
 hostip = '192.168.1.3'
-grpaddr = '234.0.0.1'
-port = 42100
+grpaddr = '239.1.2.3'
+port = 5001
 max_workers = 10  # Number of threads in the thread pool
+keep_alive_interval = 30  # Interval for sending keep-alive messages in seconds
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -39,8 +40,17 @@ def setup_socket():
         logger.error(f"Error setting up socket: {e}")
         raise SystemExit(1)
 
-# Thread pool for handling requests
-thread_pool = ThreadPoolExecutor(max_workers=max_workers)
+def send_keep_alive(channel):
+    while not shutdown_event.is_set():
+        try:
+            msg = {'type': 'keep_alive', 'status': 'OK'}
+            encoded = json.dumps(msg).encode('utf-8')
+            channel.sendto(encoded, (grpaddr, port))
+            logger.info("Sent keep-alive message")
+
+            shutdown_event.wait(keep_alive_interval)
+        except Exception as e:
+            logger.error(f"Error sending keep-alive: {e}")
 
 
 def send_and_receive(channel):
@@ -88,6 +98,10 @@ if __name__ == "__main__":
     message_thread = threading.Thread(target=receive_messages, args=(channel,))
     message_thread.daemon = True
     message_thread.start()
+
+    keep_alive_thread = threading.Thread(target=send_keep_alive, args=(channel,))
+    keep_alive_thread.daemon = True
+    keep_alive_thread.start()
     
     atexit.register(shutdown, channel)
     
