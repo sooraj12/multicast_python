@@ -12,8 +12,8 @@ app = Flask(__name__)
 
 # Configuration
 hostip = '192.168.1.3'
-grpaddr = '239.1.2.3'
-port = 5001
+grpaddr = '234.0.0.1'
+port = 42100
 max_workers = 10  # Number of threads in the thread pool
 keep_alive_interval = 30  # Interval for sending keep-alive messages in seconds
 
