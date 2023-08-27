@@ -39,7 +39,6 @@ def setup_socket():
         channel.bind(('', port))
         mreq = struct.pack("=4s4s", socket.inet_aton(grpaddr), socket.inet_aton(hostip))
         channel.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-        channel.settimeout(50)
 
         return channel
     except Exception as e:
