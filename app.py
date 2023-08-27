@@ -9,7 +9,7 @@ import sys
 import time
 
 from concurrent.futures import ThreadPoolExecutor
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from scapy.contrib.igmp import IGMP
 
 app = Flask(__name__)
@@ -19,7 +19,7 @@ hostip = '192.168.1.3'
 grpaddr = '234.0.0.1'
 port = 42100
 max_workers = 10  # Number of threads in the thread pool
-keep_alive_interval = 10  # Interval for sending keep-alive messages in seconds
+keep_alive_interval = 150  # Interval for sending keep-alive messages in seconds
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -67,10 +67,9 @@ def send_membership_report():
             logger.error(f"Error sending membership report: {e}")
 
 
-def send_and_receive():
+def send_and_receive(msg):
     try:  
         mcgrp = (grpaddr, port)
-        msg = {'type': 'message', 'message': 'message from ' + hostip, 'status': 'success'}
         encoded = json.dumps(msg).encode('utf-8')
         with channel_lock:
             channel.sendto(encoded, mcgrp)
@@ -105,9 +104,9 @@ def shutdown():
 def health():
     return jsonify(message="OK"), 200
 
-@app.route('/send', methods=['GET'])
+@app.route('/send', methods=['POST'])
 def send():
-    thread_pool.submit(send_and_receive)
+    thread_pool.submit(send_and_receive, request.json)
     return jsonify(message="OK"), 200
 
 if __name__ == "__main__":
