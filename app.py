@@ -14,30 +14,33 @@ port = 5001
 msg = {'type': 'message', 'message': 'message from windows', 'status': 'success'}
 ack = {'type': 'ack', 'res': 'acknowledge from windows'}
 
+channel = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM,
+                       proto=socket.IPPROTO_UDP, fileno=None)
+
 def send_and_receive():
     try:
-        sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+      
         mcgrp = (grpaddr, port)
 
-        sender.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
-        sender.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(hostip))
+        channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
+        channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(hostip))
 
         encoded = json.dumps(msg).encode('utf-8')
-        sender.sendto(encoded, mcgrp)
+        channel.sendto(encoded, mcgrp)
     except Exception as e:
         print(f"Error in sending: {e}")
 
 def receive_messages():
     try:
-        receiver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+      
         bindaddr = ('', port)
-        receiver.bind(bindaddr)
+        channel.bind(bindaddr)
 
         mreq = struct.pack("=4s4s", socket.inet_aton(grpaddr), socket.inet_aton(hostip))
-        receiver.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+        channel.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
         while not shutdown_event.is_set():
-            buf, senderaddr = receiver.recvfrom(1024)
+            buf, senderaddr = channel.recvfrom(1024)
 
             msg = json.loads(buf)
 
