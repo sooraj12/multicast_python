@@ -15,7 +15,7 @@ from scapy.contrib.igmp import IGMP
 app = Flask(__name__)
 
 # Configuration
-hostip = '192.168.1.4'
+hostip = '192.168.1.3'
 grpaddr = '234.0.0.1'
 port = 42100
 max_workers = 10  # Number of threads in the thread pool
@@ -31,12 +31,10 @@ channel_lock = threading.Lock()
 channel = None
 
 # Construct IGMP Membership Report packet
-igmp_type = 0x22  # IGMP Membership Report
-max_response_time = 0x00  # Unused in IGMPv2
-checksum = 0x0000  # Placeholder for checksum
+igmp_type = 0x11  # IGMP Membership Report
 
 # Create an IGMP packet
-igmp_packet = IGMP(type=0x11, gaddr=grpaddr)
+igmp_packet = IGMP(type=igmp_type, gaddr=grpaddr)
 
 
 def setup_socket():
@@ -60,7 +58,7 @@ def send_membership_report():
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IGMP)
             sock.bind((hostip, port)) 
-            sock.sendto(igmp_packet, (grpaddr, port))
+            sock.sendto(bytes(igmp_packet), (grpaddr, port))
             logger.info("Sent membership report")
 
             # # Wait for the next interval before sending the next report
@@ -68,24 +66,6 @@ def send_membership_report():
         except Exception as e:
             logger.error(f"Error sending membership report: {e}")
 
-
-def send_keep_alive():
-    # Start the thread for sending membership reports
-    membership_thread = threading.Thread(target=send_membership_report)
-    membership_thread.daemon = True
-    membership_thread.start()
-
-    while not shutdown_event.is_set():
-        try:
-            msg = {'type': 'keep_alive', 'status': 'OK'}
-            encoded = json.dumps(msg).encode('utf-8')
-            with channel_lock:
-                channel.sendto(encoded, (grpaddr, port))
-            logger.info("Sent keep-alive message")
-
-            shutdown_event.wait(keep_alive_interval)
-        except Exception as e:
-            logger.error(f"Error sending keep-alive: {e}")
 
 def send_and_receive():
     try:  
@@ -144,7 +124,7 @@ if __name__ == "__main__":
     message_thread.daemon = True
     message_thread.start()
 
-    keep_alive_thread = threading.Thread(target=send_keep_alive)
+    keep_alive_thread = threading.Thread(target=send_membership_report)
     keep_alive_thread.daemon = True
     keep_alive_thread.start()
     
