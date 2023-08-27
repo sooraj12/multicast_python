@@ -10,6 +10,7 @@ import time
 
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, jsonify
+from scapy.contrib.igmp import IGMP
 
 app = Flask(__name__)
 
@@ -34,26 +35,8 @@ igmp_type = 0x22  # IGMP Membership Report
 max_response_time = 0x00  # Unused in IGMPv2
 checksum = 0x0000  # Placeholder for checksum
 
-
-# Calculate checksum (set checksum field to 0 and then compute the checksum)
-def calculate_checksum(data):
-    if len(data) % 2 == 1:
-        data += b'\x00'
-    s = sum(struct.unpack('!%sH' % (len(data) // 2), data))
-    s = (s >> 16) + (s & 0xFFFF)
-    s += (s >> 16)
-    return socket.htons(~s & 0xFFFF)
-
-# IGMPv2 Membership Report packet structure
-igmp_packet_without_checksum = struct.pack("!BBH4s", igmp_type, max_response_time, 0, socket.inet_aton(grpaddr))
-
-# Calculate the checksum over the entire packet excluding the checksum field itself
-checksum = calculate_checksum(igmp_packet_without_checksum)
-correct_checksum = ((checksum & 0xFF) << 8) | ((checksum >> 8) & 0xFF)
-# Now update the packet with the correct checksum value
-igmp_packet = struct.pack("!BBH4s", igmp_type, max_response_time, correct_checksum, socket.inet_aton(grpaddr))
-
-igmp_packet = igmp_packet[:2] + struct.pack("!H", correct_checksum) + igmp_packet[4:]
+# Create an IGMP packet
+igmp_packet = IGMP(type=0x11, gaddr=grpaddr)
 
 
 def setup_socket():
@@ -76,7 +59,7 @@ def send_membership_report():
     while not shutdown_event.is_set():
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IGMP)
-            sock.bind((hostip, port))
+            sock.bind((hostip, port)) 
             sock.sendto(igmp_packet, (grpaddr, port))
             logger.info("Sent membership report")
 
