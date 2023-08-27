@@ -68,26 +68,47 @@ def send_membership_report():
 
 
 def send_and_receive(msg):
-    try:  
+    try:
         mcgrp = (grpaddr, port)
         encoded = json.dumps(msg).encode('utf-8')
-        with channel_lock:
-            channel.sendto(encoded, mcgrp)
+        chunk_size = 256 
+
+        for i in range(0, len(encoded), chunk_size):
+            chunk = encoded[i:i + chunk_size]
+            chunk_msg = {
+                "chunk_id": i // chunk_size,
+                "total_chunks": (len(encoded) + chunk_size - 1) // chunk_size,
+                "data": chunk.decode('utf-8')
+            }
+
+            with channel_lock:
+                channel.sendto(json.dumps(chunk_msg).encode('utf-8'), mcgrp)
 
     except Exception as e:
         logger.error(f"Error in sending: {e}")
 
 def receive_messages():
     try:
+        chunk_buffer = {} 
         while not shutdown_event.is_set():
             try:
                 buf, senderaddr = channel.recvfrom(1024)
                 if buf:
-                    received_msg = json.loads(buf)
-                    logger.info(f"Received message from {senderaddr}: {received_msg}")
+                    chunk_msg = json.loads(buf)
+                    chunk_id = chunk_msg["chunk_id"]
+                    total_chunks = chunk_msg["total_chunks"]
+                    chunk_data = chunk_msg["data"]
+
+                    chunk_buffer[chunk_id] = chunk_data
+
+                    if len(chunk_buffer) == total_chunks:
+                        complete_message = "".join(chunk_buffer[i] for i in range(total_chunks))
+                        del chunk_buffer
+                        logger.info(f"Received message from {senderaddr}: {complete_message}")
+
             except socket.error as e:
                 if e.errno == 35:
-                    time.sleep(0.1)  # Sleep for a short time before trying again
+                    time.sleep(0.1)
                     continue
                 else:
                     logger.error(f"Socket error in receiving: {e}")
