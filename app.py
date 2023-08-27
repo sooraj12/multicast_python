@@ -95,10 +95,16 @@ def send_and_receive():
 def receive_messages():
     try:
         while not shutdown_event.is_set():
-            buf, senderaddr = channel.recvfrom(1024)
-            if buf:
-                received_msg = json.loads(buf)
-                logger.info(f"Received message from {senderaddr}: {received_msg}")
+            try:
+                buf, senderaddr = channel.recvfrom(1024)
+                if buf:
+                    received_msg = json.loads(buf)
+                    logger.info(f"Received message from {senderaddr}: {received_msg}")
+            except socket.error as e:
+                if e.errno == 10035:
+                    continue  # No data available at the moment, continue the loop
+                else:
+                    logger.error(f"Socket error in receiving: {e}")
     except Exception as e:
         logger.error(f"Error in receiving: {e}")
 
