@@ -6,6 +6,7 @@ import signal
 import atexit
 import logging
 import sys
+import time
 
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, jsonify
@@ -13,7 +14,7 @@ from flask import Flask, jsonify
 app = Flask(__name__)
 
 # Configuration
-hostip = '192.168.1.4'
+hostip = '192.168.1.3'
 grpaddr = '234.0.0.1'
 port = 42100
 max_workers = 10  # Number of threads in the thread pool
@@ -101,8 +102,9 @@ def receive_messages():
                     received_msg = json.loads(buf)
                     logger.info(f"Received message from {senderaddr}: {received_msg}")
             except socket.error as e:
-                if e.errno == 10035:
-                    continue  # No data available at the moment, continue the loop
+                if e.errno == 35:
+                    time.sleep(0.1)  # Sleep for a short time before trying again
+                    continue
                 else:
                     logger.error(f"Socket error in receiving: {e}")
     except Exception as e:
