@@ -6,13 +6,14 @@ import signal
 import atexit
 import logging
 import sys
+
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, jsonify
 
 app = Flask(__name__)
 
 # Configuration
-hostip = '192.168.1.3'
+hostip = '192.168.1.4'
 grpaddr = '234.0.0.1'
 port = 42100
 max_workers = 10  # Number of threads in the thread pool
@@ -107,10 +108,6 @@ def shutdown():
             channel.close()
         shutdown_event.set()
 
-def graceful_shutdown(signum, frame):
-    logger.info("Received signal to shutdown gracefully.")
-    shutdown()
-
 @app.route('/health', methods=["GET"])
 def health():
     return jsonify(message="OK"), 200
@@ -121,14 +118,13 @@ def send():
     return jsonify(message="OK"), 200
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGINT, graceful_shutdown)
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
     
     try:
         channel = setup_socket()
     except SystemExit:
         logger.error("Exiting due to socket setup failure.")
         sys.exit(1)
-
     thread_pool = ThreadPoolExecutor(max_workers=max_workers)
     
     message_thread = threading.Thread(target=receive_messages)
