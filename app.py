@@ -15,6 +15,7 @@ msg = {'type': 'message', 'message': 'message from mac', 'status': 'success'}
 ack = {'type': 'ack', 'res': 'acknowledge from mac'}
 
 channel = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP, fileno=None)
+channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 0)
 
 def send_and_receive():
     try:
@@ -23,7 +24,6 @@ def send_and_receive():
 
         channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
         channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(hostip))
-        channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 0)
 
         encoded = json.dumps(msg).encode('utf-8')
         channel.sendto(encoded, mcgrp)
@@ -58,7 +58,7 @@ def receive_messages():
             # Send acknowledgment back to sender with the received sequence number
             ack_msg = ack
             ack_msg_encoded = json.dumps(ack_msg).encode('utf-8')
-            channel.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 0)
+      
             channel.sendto(ack_msg_encoded, senderaddr)
 
             print(f"Received message from {senderaddr}: {msg}")
