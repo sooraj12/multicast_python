@@ -8,9 +8,9 @@ import time
 from scapy.contrib.igmp import IGMP
 
 # Configuration
-hostip = "192.168.1.2"
+hostip = "192.168.1.4"
 grpaddr = "234.0.0.1"
-port = 5003
+port = 42100
 keep_alive_interval = 150  # Interval for sending keep-alive messages in seconds
 igmp_type = 0x11  # IGMP Membership Report
 
@@ -72,65 +72,48 @@ class MultiCast:
             except Exception as e:
                 logger.error(f"Error sending membership report: {e}")
 
-    def send_cast(self, msg, target_ips=None):
+    def send_cast(self, msg):
         try:
-            if target_ips is None:
-                target_ips = [grpaddr]
-            
+            mcgrp = (grpaddr, port)
             encoded = json.dumps(msg).encode("utf-8")
-            chunk_size = 2096
-            total_chunks = (len(encoded) + chunk_size - 1) // chunk_size  # Calculate total chunks
+            chunk_size = 700
 
-            # Generate a unique message ID
-            message_id = str(time.time())  # You can use a more sophisticated approach
+            for i in range(0, len(encoded), chunk_size):
+                chunk = encoded[i : i + chunk_size]
+                chunk_msg = {
+                    "chunk_id": i // chunk_size,
+                    "total_chunks": (len(encoded) + chunk_size - 1) // chunk_size,
+                    "data": chunk.decode("utf-8"),
+                }
 
-            for target_ip in target_ips:
-                mcgrp = (target_ip, port)
-            
-                for i in range(0, len(encoded), chunk_size):
-                    chunk = encoded[i: i + chunk_size]
-                    chunk_id = i // chunk_size  # Calculate chunk_id based on the chunk index
-
-                    chunk_msg = {
-                        "message_id": message_id,
-                        "chunk_id": chunk_id,
-                        "total_chunks": total_chunks,
-                        "data": chunk.decode("utf-8"),
-                    }
-
-                    with channel_lock:
-                        self.channel.sendto(json.dumps(chunk_msg).encode("utf-8"), mcgrp)
+                with channel_lock:
+                    self.channel.sendto(json.dumps(chunk_msg).encode("utf-8"), mcgrp)
 
         except Exception as e:
             logger.error(f"Error in sending: {e}")
 
     def receive_cast(self):
         try:
-            message_buffers = {}  # Store incomplete messages until all chunks are received
-
+            chunk_buffer = {}
             while not shutdown_event.is_set():
                 try:
-                    buf, senderaddr = self.channel.recvfrom(8192)
+                    buf, senderaddr = self.channel.recvfrom(1024)
                     if buf:
                         chunk_msg = json.loads(buf)
-                        message_id = chunk_msg["message_id"]
                         chunk_id = chunk_msg["chunk_id"]
                         total_chunks = chunk_msg["total_chunks"]
                         chunk_data = chunk_msg["data"]
-                        print(chunk_id)
-                        print(total_chunks)
-                        if message_id not in message_buffers:
-                            message_buffers[message_id] = [None] * total_chunks
-                        
-                        message_buffers[message_id][chunk_id] = chunk_data
-                        if None not in message_buffers[message_id]:
-                            complete_message = "".join(message_buffers[message_id])
-                            del message_buffers[message_id]
+
+                        chunk_buffer[chunk_id] = chunk_data
+
+                        if len(chunk_buffer) == total_chunks:
+                            complete_message = "".join(
+                                chunk_buffer[i] for i in range(total_chunks)
+                            )
+                            chunk_buffer = {}
                             logger.info(
                                 f"Received message from {senderaddr}: {complete_message}"
                             )
-                            message = json.loads(complete_message)
-                            print(message['type'])
 
                 except socket.error as e:
                     if e.errno == 35:
